@@ -26,16 +26,7 @@ package pro.javacard.gp;
 import apdu4j.HexUtils;
 import apdu4j.ISO7816;
 import com.google.common.collect.Lists;
-import org.bouncycastle.asn1.ASN1Encodable;
-import org.bouncycastle.asn1.ASN1InputStream;
-import org.bouncycastle.asn1.ASN1OctetString;
-import org.bouncycastle.asn1.ASN1Primitive;
-import org.bouncycastle.asn1.ASN1Sequence;
-import org.bouncycastle.asn1.ASN1TaggedObject;
-import org.bouncycastle.asn1.BERTags;
-import org.bouncycastle.asn1.DERApplicationSpecific;
-import org.bouncycastle.asn1.DEROctetString;
-import org.bouncycastle.asn1.DERTaggedObject;
+import org.bouncycastle.asn1.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import pro.javacard.gp.GPData.KeyType;
@@ -51,12 +42,7 @@ import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.PrintStream;
+import java.io.*;
 import java.math.BigInteger;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
@@ -340,7 +326,7 @@ public class GlobalPlatform {
      * {@link #openSecureChannel openSecureChannel}.
      *
      * @throws GPException   if security domain selection fails for some reason
-     * @throws CardException on data transmission errors
+     * @throws CardExceptionWrapper on data transmission errors
      */
     @Deprecated
     public void select() throws GPException, CardExceptionWrapper {
@@ -349,7 +335,7 @@ public class GlobalPlatform {
         }
     }
 
-    private ResponseAPDU always_transmit(CommandAPDUWrapper cmd) throws CardExceptionWrapper, GPException {
+    private ResponseAPDUWrapper always_transmit(CommandAPDUWrapper cmd) throws CardExceptionWrapper, GPException {
         if (wrapper != null) {
             return transmit(cmd);
         } else {
@@ -361,7 +347,7 @@ public class GlobalPlatform {
         // FIXME: this assumes selected ISD. We always request the version with tags (GP CLA)
         // Key Information Template
         CommandAPDUWrapper command = new CommandAPDUWrapper(CLA_GP, ISO7816.INS_GET_DATA, 0x00, 0xE0, 256);
-        ResponseAPDU resp = always_transmit(command);
+        ResponseAPDUWrapper resp = always_transmit(command);
 
         if (resp.getSW() == ISO7816.SW_NO_ERROR) {
             return GPData.get_key_template_list(resp.getData());
@@ -374,7 +360,7 @@ public class GlobalPlatform {
     public byte[] fetchCardData() throws CardExceptionWrapper, GPException {
         // Card data
         CommandAPDUWrapper command = new CommandAPDUWrapper(CLA_GP, ISO7816.INS_GET_DATA, 0x00, 0x66, 256);
-        ResponseAPDU resp = always_transmit(command);
+        ResponseAPDUWrapper resp = always_transmit(command);
         if (resp.getSW() == 0x6A86) {
             logger.debug("GET DATA(CardData) not supported, Open Platform 2.0.1 card? " + GPUtils.swToString(resp.getSW()));
             return null;
@@ -413,7 +399,7 @@ public class GlobalPlatform {
         }
 
         // Sequence Counter of the default Key Version Number (tag 0xC1)
-        command = new CommandAPDUWrapper(CLA_GP, ISO7816.INS_GET_DATA, 0x00, 0xC1, 256));
+        command = new CommandAPDUWrapper(CLA_GP, ISO7816.INS_GET_DATA, 0x00, 0xC1, 256);
         resp = channel.transmit(command);
         if (resp.getSW() == 0x9000) {
             byte[] ssc = resp.getData();
@@ -473,7 +459,7 @@ public class GlobalPlatform {
         // TODO: use it here for KeyID?
         CommandAPDUWrapper initUpdate = new CommandAPDUWrapper(CLA_GP, INS_INITIALIZE_UPDATE, keys.getKeysetVersion(), keys.getKeysetID(), host_challenge, 256);
 
-        ResponseAPDU response = channel.transmit(initUpdate);
+        ResponseAPDUWrapper response = channel.transmit(initUpdate);
         int sw = response.getSW();
 
         // Detect and report locked cards in a more sensible way.
@@ -612,9 +598,9 @@ public class GlobalPlatform {
         }
     }
 
-    public ResponseAPDU transmit(CommandAPDUWrapper command) throws CardExceptionWrapper, GPException {
+    public ResponseAPDUWrapper transmit(CommandAPDUWrapper command) throws CardExceptionWrapper, GPException {
         CommandAPDUWrapper wc = wrapper.wrap(command);
-        ResponseAPDU wr = channel.transmit(wc);
+        ResponseAPDUWrapper wr = channel.transmit(wc);
         return wrapper.unwrap(wr);
     }
 
@@ -658,7 +644,7 @@ public class GlobalPlatform {
         }
 
         CommandAPDUWrapper installForLoad = new CommandAPDUWrapper(CLA_GP, INS_INSTALL, 0x02, 0x00, bo.toByteArray());
-        ResponseAPDU response = transmit(installForLoad);
+        ResponseAPDUWrapper response = transmit(installForLoad);
         GPException.check(response, "Install for Load failed");
 
         List<byte[]> blocks = cap.getLoadBlocks(includeDebug, separateComponents, wrapper.getBlockSize());
@@ -694,12 +680,12 @@ public class GlobalPlatform {
      */
     @Deprecated
     public void installAndMakeSelectable(AID packageAID, AID appletAID, AID instanceAID, byte privileges, byte[] installParams,
-                                         byte[] installToken) throws GPException, CardException {
+                                         byte[] installToken) throws GPException, CardExceptionWrapper {
 
         installAndMakeSelectable(packageAID, appletAID, instanceAID, Privileges.fromByte(privileges), installParams, installToken);
     }
 
-    public void installAndMakeSelectable(AID packageAID, AID appletAID, AID instanceAID, Privileges privileges, byte[] installParams, byte[] installToken) throws GPException, CardException {
+    public void installAndMakeSelectable(AID packageAID, AID appletAID, AID instanceAID, Privileges privileges, byte[] installParams, byte[] installToken) throws GPException, CardExceptionWrapper {
 
         if (instanceAID == null) {
             instanceAID = appletAID;
@@ -738,7 +724,7 @@ public class GlobalPlatform {
         }
 
         CommandAPDUWrapper install = new CommandAPDUWrapper(CLA_GP, INS_INSTALL, 0x0C, 0x00, bo.toByteArray());
-        ResponseAPDU response = transmit(install);
+        ResponseAPDUWrapper response = transmit(install);
         GPException.check(response, "Install for Install and make selectable failed");
         dirty = true;
     }
@@ -748,10 +734,10 @@ public class GlobalPlatform {
      *
      * @param aid - AID of the target application (or Security Domain)
      * @throws GPException
-     * @throws CardException
+     * @throws CardExceptionWrapper
      * @see GP 2.1.1 9.5.2
      */
-    public void storeData(AID aid, byte[] data) throws CardException, GPException {
+    public void storeData(AID aid, byte[] data) throws CardExceptionWrapper, GPException {
         storeData(aid, data, (byte) 0x80);
     }
 
@@ -760,10 +746,10 @@ public class GlobalPlatform {
      *
      * @param aid - AID of the target application (or Security Domain)
      * @throws GPException
-     * @throws CardException
+     * @throws CardExceptionWrapper
      * @see GP 2.1.1 9.5.2
      */
-    public void storeData(AID aid, byte[] data, byte P1) throws CardException, GPException {
+    public void storeData(AID aid, byte[] data, byte P1) throws CardExceptionWrapper, GPException {
         // send the INSTALL for personalization command
         ByteArrayOutputStream bo = new ByteArrayOutputStream();
         try {
@@ -779,7 +765,7 @@ public class GlobalPlatform {
             throw new RuntimeException(ioe);
         }
         CommandAPDUWrapper install = new CommandAPDUWrapper(CLA_GP, INS_INSTALL, 0x20, 0x00, bo.toByteArray());
-        ResponseAPDU response = transmit(install);
+        ResponseAPDUWrapper response = transmit(install);
         GPException.check(response, "Install for personalization failed");
 
         // Now pump the data
@@ -791,7 +777,7 @@ public class GlobalPlatform {
         }
     }
 
-    public void makeDefaultSelected(AID aid) throws CardException, GPException {
+    public void makeDefaultSelected(AID aid) throws CardExceptionWrapper, GPException {
         // FIXME: only works for some 2.1.1 cards ? Clarify and document
         ByteArrayOutputStream bo = new ByteArrayOutputStream();
         // Only supported privilege.
@@ -812,21 +798,21 @@ public class GlobalPlatform {
         }
 
         CommandAPDUWrapper install = new CommandAPDUWrapper(CLA_GP, INS_INSTALL, 0x08, 0x00, bo.toByteArray());
-        ResponseAPDU response = transmit(install);
+        ResponseAPDUWrapper response = transmit(install);
         GPException.check(response, "Install for make selectable failed");
         dirty = true;
     }
 
-    public void lockUnlockApplet(AID app, boolean lock) throws CardException, GPException {
+    public void lockUnlockApplet(AID app, boolean lock) throws CardExceptionWrapper, GPException {
         CommandAPDUWrapper cmd = new CommandAPDUWrapper(CLA_GP, INS_SET_STATUS, 0x40, lock ? 0x80 : 0x00, app.getBytes());
-        ResponseAPDU response = transmit(cmd);
+        ResponseAPDUWrapper response = transmit(cmd);
         GPException.check(response, "SET STATUS failed");
         dirty = true;
     }
 
-    public void setCardStatus(byte status) throws CardException, GPException {
+    public void setCardStatus(byte status) throws CardExceptionWrapper, GPException {
         CommandAPDUWrapper cmd = new CommandAPDUWrapper(CLA_GP, INS_SET_STATUS, 0x80, status);
-        ResponseAPDU response = transmit(cmd);
+        ResponseAPDUWrapper response = transmit(cmd);
         GPException.check(response, "SET STATUS failed");
         dirty = true;
     }
@@ -837,9 +823,9 @@ public class GlobalPlatform {
      *
      * @param aid        identifier of the file to delete
      * @param deleteDeps if true delete dependencies as well
-     * @throws CardException for low-level communication errors
+     * @throws CardExceptionWrapper for low-level communication errors
      */
-    public void deleteAID(AID aid, boolean deleteDeps) throws GPException, CardException {
+    public void deleteAID(AID aid, boolean deleteDeps) throws GPException, CardExceptionWrapper {
         ByteArrayOutputStream bo = new ByteArrayOutputStream();
         try {
             bo.write(0x4f);
@@ -849,7 +835,7 @@ public class GlobalPlatform {
             throw new RuntimeException(ioe);
         }
         CommandAPDUWrapper delete = new CommandAPDUWrapper(CLA_GP, INS_DELETE, 0x00, deleteDeps ? 0x80 : 0x00, bo.toByteArray());
-        ResponseAPDU response = transmit(delete);
+        ResponseAPDUWrapper response = transmit(delete);
         GPException.check(response, "Deletion failed");
         dirty = true;
     }
@@ -904,7 +890,7 @@ public class GlobalPlatform {
     }
 
 
-    public void putKeys(List<GPKeySet.GPKey> keys, boolean replace) throws GPException, CardException {
+    public void putKeys(List<GPKeySet.GPKey> keys, boolean replace) throws GPException, CardExceptionWrapper {
         if (keys.size() < 1 || keys.size() > 3) {
             throw new IllegalArgumentException("Can add 1 or up to 3 keys at a time");
         }
@@ -975,12 +961,12 @@ public class GlobalPlatform {
         }
 
         CommandAPDUWrapper command = new CommandAPDUWrapper(CLA_GP, INS_PUT_KEY, P1, P2, bo.toByteArray());
-        ResponseAPDU response = transmit(command);
+        ResponseAPDUWrapper response = transmit(command);
         GPException.check(response, "PUT KEY failed");
     }
 
 
-    public GPRegistry getRegistry() throws GPException, CardException {
+    public GPRegistry getRegistry() throws GPException, CardExceptionWrapper {
         if (dirty) {
             registry = getStatus();
             dirty = false;
@@ -990,12 +976,12 @@ public class GlobalPlatform {
 
 
     // TODO: The way registry parsing mode is piggybacked to the registry class is not really nice.
-    private byte[] getConcatenatedStatus(GPRegistry reg, int p1, byte[] data) throws CardException, GPException {
+    private byte[] getConcatenatedStatus(GPRegistry reg, int p1, byte[] data) throws CardExceptionWrapper, GPException {
         // By default use tags
         int p2 = reg.tags ? 0x02 : 0x00;
 
         CommandAPDUWrapper cmd = new CommandAPDUWrapper(CLA_GP, INS_GET_STATUS, p1, p2, data, 256);
-        ResponseAPDU response = transmit(cmd);
+        ResponseAPDUWrapper response = transmit(cmd);
 
         // Workaround for legacy cards, like SCE 6.0 FIXME: this does not work properly
         // Find a different way to adjust the response parser without touching the overall spec mode
@@ -1046,7 +1032,7 @@ public class GlobalPlatform {
     }
 
 
-    private GPRegistry getStatus() throws CardException, GPException {
+    private GPRegistry getStatus() throws CardExceptionWrapper, GPException {
         GPRegistry registry = new GPRegistry();
 
         if (spec == GPSpec.OP201) {
@@ -1256,7 +1242,7 @@ public class GlobalPlatform {
             }
         }
 
-        public ResponseAPDU unwrap(ResponseAPDU response) throws GPException {
+        public ResponseAPDUWrapper unwrap(ResponseAPDUWrapper response) throws GPException {
             if (rmac) {
                 if (response.getData().length < 8) {
                     throw new RuntimeException("Wrong response length (too short).");
@@ -1278,7 +1264,7 @@ public class GlobalPlatform {
                 o.write(response.getBytes(), 0, respLen);
                 o.write(response.getSW1());
                 o.write(response.getSW2());
-                response = new ResponseAPDU(o.toByteArray());
+                response = new ResponseAPDUWrapper(o.toByteArray());
             }
             return response;
         }
@@ -1368,7 +1354,7 @@ public class GlobalPlatform {
         }
 
         @Override
-        protected ResponseAPDU unwrap(ResponseAPDU response) throws GPException {
+        protected ResponseAPDUWrapper unwrap(ResponseAPDUWrapper response) throws GPException {
             return response;
         }
     }
@@ -1397,6 +1383,6 @@ public class GlobalPlatform {
 
         protected abstract CommandAPDUWrapper wrap(CommandAPDUWrapper command) throws GPException;
 
-        protected abstract ResponseAPDU unwrap(ResponseAPDU response) throws GPException;
+        protected abstract ResponseAPDUWrapper unwrap(ResponseAPDUWrapper response) throws GPException;
     }
 }

@@ -9,6 +9,10 @@ public class ResponseAPDUWrapper {
         this.responseAPDU = responseAPDU;
     }
 
+    public ResponseAPDUWrapper(byte[] bytes) {
+        responseAPDU = new ResponseAPDU(bytes);
+    }
+
     ResponseAPDU getWrapped() {
         return responseAPDU;
     }
@@ -19,5 +23,17 @@ public class ResponseAPDUWrapper {
 
     public byte[] getData() {
         return responseAPDU.getData();
+    }
+
+    public byte[] getBytes() {
+        return responseAPDU.getBytes();
+    }
+
+    public int getSW1() {
+        return responseAPDU.getSW1();
+    }
+
+    public int getSW2() {
+        return responseAPDU.getSW2();
     }
 }

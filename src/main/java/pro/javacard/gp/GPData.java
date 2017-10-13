@@ -309,7 +309,7 @@ public final class GPData {
 
 
 	// TODO public for debuggin purposes
-	public static void print_card_info(GlobalPlatform gp) throws CardException, GPException {
+	public static void print_card_info(GlobalPlatform gp) throws  GPException, CardExceptionWrapper {
 		// Print CPLC
 		pretty_print_cplc(gp.getCPLC(), System.out);
 		// Requires GP?

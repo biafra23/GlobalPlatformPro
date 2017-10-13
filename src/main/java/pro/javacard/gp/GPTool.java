@@ -20,31 +20,11 @@
  */
 package pro.javacard.gp;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.EnumSet;
-import java.util.List;
-
-import javax.crypto.Cipher;
-import javax.smartcardio.Card;
-import javax.smartcardio.CardException;
-import javax.smartcardio.CardTerminal;
-import javax.smartcardio.CardTerminals;
-import javax.smartcardio.CardTerminals.State;
-import javax.smartcardio.CommandAPDU;
-import javax.smartcardio.TerminalFactory;
-
-import com.google.common.base.Joiner;
-
 import apdu4j.APDUReplayProvider;
 import apdu4j.HexUtils;
 import apdu4j.LoggingCardTerminal;
 import apdu4j.TerminalManager;
+import com.google.common.base.Joiner;
 import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
@@ -57,6 +37,15 @@ import pro.javacard.gp.GPRegistryEntry.Privilege;
 import pro.javacard.gp.GPRegistryEntry.Privileges;
 import pro.javacard.gp.GlobalPlatform.APDUMode;
 import pro.javacard.gp.GlobalPlatform.GPSpec;
+
+import javax.crypto.Cipher;
+import javax.smartcardio.*;
+import javax.smartcardio.CardTerminals.State;
+import java.io.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.List;
 
 
 public final class GPTool {
@@ -435,14 +424,14 @@ public final class GPTool {
 					// Send all raw APDU-s to the default-selected application of the card
 					if (args.has(OPT_APDU)) {
 						for (Object s: args.valuesOf(OPT_APDU)) {
-							CommandAPDU c = new CommandAPDUWrapper((byte[]) s);
-							card.getBasicChannel().transmit(c);
+							CommandAPDUWrapper c = new CommandAPDUWrapper((byte[]) s);
+							new CardChannelWrapper(card.getBasicChannel()).transmit(c);
 						}
 					}
 
 					// list access rules
 					if (args.has(OPT_ACR_LIST)) {
-						SEAccessControlUtility.acrList(gp, card);
+						SEAccessControlUtility.acrList(gp, new CardWrapper(card));
 					}
 
 					// Talk to the card manager (can be null)
@@ -475,7 +464,7 @@ public final class GPTool {
 						// --secure-apdu or -s
 						if (args.has(OPT_SECURE_APDU)) {
 							for (Object s: args.valuesOf(OPT_SECURE_APDU)) {
-								CommandAPDU c = new CommandAPDU((byte[])s);
+								CommandAPDUWrapper c = new CommandAPDUWrapper((byte[])s);
 								gp.transmit(c);
 							}
 						}
@@ -844,7 +833,7 @@ public final class GPTool {
 					if (!args.has(OPT_RELAX)) {
 						fail(e.getMessage());
 					}
-				} catch (CardException e) {
+				} catch (CardExceptionWrapper e) {
 					// Card exceptions skip to the next reader, if available and allowed FIXME broken logic
 					continue;
 				} finally {

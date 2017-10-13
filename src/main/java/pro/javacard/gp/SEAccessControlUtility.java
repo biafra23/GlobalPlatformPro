@@ -23,10 +23,6 @@
  */
 package pro.javacard.gp;
 
-import javax.smartcardio.Card;
-import javax.smartcardio.CardException;
-import javax.smartcardio.CommandAPDU;
-import javax.smartcardio.ResponseAPDU;
 
 /**
  * SE Access Control utility.
@@ -39,13 +35,13 @@ public final class SEAccessControlUtility {
 	 * @param card
 	 * @param P1
 	 * @return
-	 * @throws CardException
+	 * @throws CardExceptionWrapper
 	 * @throws GPException
 	 */
-	private static ResponseAPDU sendAcrGetData(final Card card, final byte P1) throws CardException, GPException {
-		CommandAPDU list = new CommandAPDU(GlobalPlatform.CLA_GP, GlobalPlatform.INS_GET_DATA, 0xFF, P1, 256);
+	private static ResponseAPDUWrapper sendAcrGetData(final CardWrapper card, final byte P1) throws CardExceptionWrapper, GPException {
+		CommandAPDUWrapper list = new CommandAPDUWrapper(GlobalPlatform.CLA_GP, GlobalPlatform.INS_GET_DATA, 0xFF, P1, 256);
 
-		ResponseAPDU response = card.getBasicChannel().transmit(list);
+		ResponseAPDUWrapper response = new CardChannelWrapper(card.getBasicChannel()).transmit(list);
 
 		try {
 			GPException.check(response, "ACR GET DATA failed");
@@ -62,13 +58,13 @@ public final class SEAccessControlUtility {
 	 * List access rules.
 	 *
 	 * @param card
-	 * @throws CardException
+	 * @throws CardExceptionWrapper
 	 * @throws GPException
 	 */
-	public static void acrList(final GlobalPlatform gp, final Card card) throws CardException, GPException {
+	public static void acrList(final GlobalPlatform gp, final CardWrapper card) throws CardExceptionWrapper, GPException {
 		boolean selected = gp.select(SEAccessControl.ACR_AID);
 		if (selected) {
-			ResponseAPDU response = sendAcrGetData(card, SEAccessControl.ACR_GET_DATA_ALL);
+			ResponseAPDUWrapper response = sendAcrGetData(card, SEAccessControl.ACR_GET_DATA_ALL);
 			SEAccessControl.BerTlvData temp = SEAccessControl.AcrListResponse.getAcrListData(null, response.getData());
 
 			while (temp.getCurrentIndex() < temp.getLength()) {
@@ -89,10 +85,10 @@ public final class SEAccessControlUtility {
 	 * @param aid
 	 * @param hash
 	 * @param rules
-	 * @throws CardException
+	 * @throws CardExceptionWrapper
 	 * @throws GPException
 	 */
-	public static void acrAdd(final GlobalPlatform gp, AID aid, final byte[] hash, final byte[] rules) throws CardException, GPException {
+	public static void acrAdd(final GlobalPlatform gp, AID aid, final byte[] hash, final byte[] rules) throws CardExceptionWrapper, GPException {
 		SEAccessControl.RefArDo refArDo = new SEAccessControl.RefArDo(aid, hash, rules);
 		SEAccessControl.StoreArDo storeArDo = new SEAccessControl.StoreArDo(refArDo);
 		acrStore(gp, storeArDo);
@@ -102,10 +98,10 @@ public final class SEAccessControlUtility {
 	 * Send store data for access rule.
 	 *
 	 * @param data TLV data
-	 * @throws CardException
+	 * @throws CardExceptionWrapper
 	 * @throws GPException
 	 */
-	public static void acrStore(final GlobalPlatform gp, final SEAccessControl.TLV data) throws CardException, GPException {
+	public static void acrStore(final GlobalPlatform gp, final SEAccessControl.TLV data) throws CardExceptionWrapper, GPException {
 		try {
 			//0x90 is for getting BER-TLV data (Secure Element Access Control v1.0 p36)
 			gp.storeData(SEAccessControl.ACR_AID, data.getBytes(), (byte) 0x90);
@@ -123,10 +119,10 @@ public final class SEAccessControlUtility {
 	 *
 	 * @param aid
 	 * @param hash
-	 * @throws CardException
+	 * @throws CardExceptionWrapper
 	 * @throws GPException
 	 */
-	public static void acrDelete(final GlobalPlatform gp, final AID aid, final byte[] hash) throws CardException, GPException {
+	public static void acrDelete(final GlobalPlatform gp, final AID aid, final byte[] hash) throws CardExceptionWrapper, GPException {
 		SEAccessControl.TLV request;
 
 		if (hash != null) {
