@@ -309,18 +309,22 @@ public final class GPData {
 
 
 	// TODO public for debuggin purposes
-	public static void print_card_info(GlobalPlatform gp) throws  GPException, CardExceptionWrapper {
-		// Print CPLC
-		pretty_print_cplc(gp.getCPLC(), System.out);
-		// Requires GP?
-		// Print CardData
-		System.out.println("***** CARD DATA");
-		byte [] card_data = gp.fetchCardData();
-		pretty_print_card_data(card_data, System.out);
-		// Print Key Info Template
-		System.out.println("***** KEY INFO");
-		pretty_print_key_template(gp.getKeyInfoTemplate(), System.out);
-	}
+	public static void print_card_info(GlobalPlatform gp) throws  GPException, CardException {
+	    try {
+            // Print CPLC
+		    pretty_print_cplc(gp.getCPLC(), System.out);
+		    // Requires GP?
+		    // Print CardData
+		    System.out.println("***** CARD DATA");
+		    byte [] card_data = gp.fetchCardData();
+            pretty_print_card_data(card_data, System.out);
+            // Print Key Info Template
+            System.out.println("***** KEY INFO");
+            pretty_print_key_template(gp.getKeyInfoTemplate(), System.out);
+        } catch (pro.javacard.gp.smardcardio.CardException e) {
+            throw new CardException(e);
+        }
+    }
 
 
 	public static final class CPLC {

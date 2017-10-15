@@ -1,18 +1,23 @@
 package pro.javacard.gp;
 
 
+import pro.javacard.gp.smardcardio.Card;
+import pro.javacard.gp.smardcardio.CardException;
+import pro.javacard.gp.smardcardio.CommandAPDU;
+import pro.javacard.gp.smardcardio.ResponseAPDU;
+
 import java.nio.ByteBuffer;
 
 public interface CardChannelInterface {
 
-    CardWrapper getCard();
+    Card getCard();
 
     int getChannelNumber();
 
-    ResponseAPDUWrapper transmit(CommandAPDUWrapper var1) throws CardExceptionWrapper;
+    ResponseAPDU transmit(CommandAPDU var1) throws CardException;
 
-    int transmit(ByteBuffer var1, ByteBuffer var2) throws CardExceptionWrapper;
+    int transmit(ByteBuffer var1, ByteBuffer var2) throws CardException;
 
-    void close() throws CardExceptionWrapper;
+    void close() throws CardException;
 
 }
